@@ -722,6 +722,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn fetch_pacts_from_broker_returns_a_list_of_pacts() {
         init().unwrap_or(());
 
