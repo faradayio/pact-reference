@@ -189,9 +189,18 @@ impl ConsumerPactBuilder {
     }
 
     /// The path of the request
-    pub fn path<S: Into<String>>(&mut self, path: S) -> &mut Self {
+    pub fn path<P: Into<JsonPattern>>(&mut self, path: P) -> &mut Self {
+        let path = path.into();
         self.push_interaction();
-        self.interaction.request.path = path.into();
+        let path_val: String = serde_json::from_value(path.to_example())
+            // TODO: This panics, which is extremely rude anywhere but tests.
+            // Do we want to panic, or return a runtime error?
+            .expect("path must be a string");
+        self.interaction.request.path = path_val;
+        path.extract_matching_rules(
+            "$.path",
+            self.interaction.request.matching_rules.get_or_insert_with(Default::default),
+        );
         self
     }
 
@@ -217,30 +226,22 @@ impl ConsumerPactBuilder {
 
     /// A header to be included in the request. Will overwrite previous headers
     /// of the same name.
-    pub fn header<S1, S2>(&mut self, key: S1, value: S2) -> &mut Self
+    pub fn header<K, V>(&mut self, key: K, value: V) -> &mut Self
     where
-        S1: Into<String>,
-        S2: Into<String>,
+        K: Into<String>,
+        V: Into<JsonPattern>,
     {
-        self.headers_mut().insert(key.into(), value.into());
+        unimplemented!("header");
+        //self.headers_mut().insert(key.into(), value.into());
         self
     }
 
     /// Headers to be included in the request. If called multiple times, this
     /// will merge the new headers with the old, overriding any duplicates.
-    pub fn headers<M, S1, S2>(&mut self, headers: M) -> &mut Self
-    where
-        // This is a bit of Rust magic: We take some type that can be turned
-        // into an iterator, and that iterator returns a pair of values that
-        // can be turned into strings. This allows mixing `&str`, `String`,
-        // `Vec<_>`, `&[_]` and actual iterators fairly freely. Generally,
-        // this kind of type is overkill for anything except builder APIs.
-        M: IntoIterator<Item = (S1, S2)>,
-        S1: Into<String>,
-        S2: Into<String>,
-    {
-        self.headers_mut()
-            .extend(headers.into_iter().map(|(k, v)| (k.into(), v.into())));
+    pub fn headers<P: Into<JsonPattern>>(&mut self, headers: P) -> &mut Self {
+        unimplemented!("headers");
+        //self.headers_mut()
+        //    .extend(headers.into_iter().map(|(k, v)| (k.into(), v.into())));
         self
     }
 
@@ -250,19 +251,18 @@ impl ConsumerPactBuilder {
         self.interaction.request.query.get_or_insert_with(|| HashMap::new())
     }
 
+    /// A query parameter to be included in the request.
+    pub fn query_param<K, V>(&mut self, key: K, value: V) -> &mut Self {
+        unimplemented!("query_param")
+    }
+
     /// The query string for the request. If called multiple times, this will
     /// merge the new query parameters with the old, overriding any duplicates.
-    pub fn query<M, S1, V, S2>(&mut self, query: M) -> &mut Self
-    where
-        // See `headers` for an explanation of these type constraints.
-        M: IntoIterator<Item = (S1, V)>,
-        S1: Into<String>,
-        V: IntoIterator<Item = S2>,
-        S2: Into<String>,
-    {
-        self.query_mut().extend(query.into_iter().map(|(k, v)| {
-            (k.into(), v.into_iter().map(|s| s.into()).collect())
-        }));
+    pub fn query<P: Into<JsonPattern>>(&mut self, query: P) -> &mut Self {
+        unimplemented!("query");
+        //self.query_mut().extend(query.into_iter().map(|(k, v)| {
+        //    (k.into(), v.into_iter().map(|s| s.into()).collect())
+        //}));
         self
     }
 
@@ -278,23 +278,29 @@ impl ConsumerPactBuilder {
         }
     }
 
-    /// The body of the request.
-    ///
-    /// TODO: See discussion about `body` naming on
-    /// https://github.com/pact-foundation/pact-reference/pull/18
-    pub fn body(&mut self, body: OptionalBody) -> &mut Self {
+    /// This method allows specifying a request or response body using the
+    /// the full `OptionalBody` choices available.
+    pub fn optional_body(&mut self, body: OptionalBody) -> &mut Self {
         *self.body_mut() = body;
+        self
+    }
+
+    /// Specify an unstructured body.
+    ///
+    /// TODO: We may want to change this to `B: Into<Vec<u8>>` depending on what
+    /// happens with https://github.com/pact-foundation/pact-reference/issues/19
+    /// That will still do the right thing with `&str`.
+    pub fn body<S: Into<String>>(&mut self, body: S) -> &mut Self {
+        *self.body_mut() = OptionalBody::Present(body.into());
         self
     }
 
     /// The body of the request, which will be wrapped in
     /// `OptionalBody::Present` (the common default case).
     ///
-    /// TODO: We may want to change this to `B: Into<Vec<u8>>` depending on what
-    /// happens with https://github.com/pact-foundation/pact-reference/issues/19
-    /// That will still do the right thing with `&str`.
-    pub fn body_present<B: Into<String>>(&mut self, body: B) -> &mut Self {
-        *self.body_mut() = OptionalBody::Present(body.into());
+    pub fn json_body<P: Into<JsonPattern>>(&mut self, body: P) -> &mut Self {
+        unimplemented!("json_body");
+        //*self.body_mut() = OptionalBody::Present(body.into());
         self
     }
 
@@ -325,10 +331,112 @@ impl ConsumerPactBuilder {
 
     /// Terminates the DSL and builds a pact fragment to represent the interactions
     pub fn build(&mut self) -> ConsumerPactRunner {
+        ConsumerPactRunner { pact: self.build_pact() }
+    }
+
+    /// Like `build`, but returns a bare `Pact` object instead of a runner.
+    pub fn build_pact(&mut self) -> Pact {
         self.pact.interactions.push(self.interaction.clone());
         self.state = BuilderState::None;
-        ConsumerPactRunner {
-            pact: self.pact.clone()
+        self.pact.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pact_matching::match_request;
+    use regex::Regex;
+
+    use super::*;
+
+    /// Check that all requests in `actual` match the patterns provide by
+    /// `expected`, and raise an error if anything fails.
+    fn check_requests_match(
+        actual_label: &str,
+        actual: &Pact,
+        expected_label: &str,
+        expected: &Pact,
+    ) -> Result<(), String> {
+        // First make sure we have the same number of interactions.
+        if expected.interactions.len() != actual.interactions.len() {
+            return Err(format!(
+                "the pact `{}` has {} interactions, but `{}` has {}",
+                expected_label,
+                expected.interactions.len(),
+                actual_label,
+                actual.interactions.len(),
+            ));
         }
+
+        // Next, check each interaction to see if it matches.
+        for (e, a) in expected.interactions.iter().zip(&actual.interactions) {
+            let mismatches = match_request(e.request.clone(), a.request.clone());
+            if !mismatches.is_empty() {
+                let mut reasons = String::new();
+                for mismatch in mismatches {
+                    reasons.push_str(&format!("- {}\n", mismatch.description()));
+                }
+                return Err(format!(
+                    "the pact `{}` does not match `{}` because:\n{}",
+                    expected_label,
+                    actual_label,
+                    reasons,
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    macro_rules! assert_requests_match {
+        ($actual:expr, $expected:expr) => (
+            {
+                let result = check_requests_match(
+                    stringify!($actual),
+                    &($actual),
+                    stringify!($expected),
+                    &($expected),
+                );
+                if let Err(message) = result {
+                    panic!("{}", message)
+                }
+            }
+        )
+    }
+
+    macro_rules! assert_requests_do_not_match {
+        ($actual:expr, $expected:expr) => (
+            {
+                let result = check_requests_match(
+                    stringify!($actual),
+                    &($actual),
+                    stringify!($expected),
+                    &($expected),
+                );
+                if let Ok(()) = result {
+                    panic!(
+                        "pact `{}` unexpectedly matched pattern `{}`",
+                        stringify!($actual),
+                        stringify!($expected),
+                    );
+                }
+            }
+        )
+    }
+
+    #[test]
+    fn path_pattern() {
+        let greeting_regex = Regex::new("/greeting/.*").unwrap();
+        let pattern = ConsumerPactBuilder::consumer("A")
+            .path(Term::new(greeting_regex, "/greeting/hello"))
+            .build_pact();
+        let good = ConsumerPactBuilder::consumer("A")
+            .path("/greeting/hi")
+            .build_pact();
+        let bad = ConsumerPactBuilder::consumer("A")
+            .path("/farewell/bye")
+            .build_pact();
+        assert_requests_match!(good, pattern);
+        assert_requests_do_not_match!(bad, pattern);
     }
 }

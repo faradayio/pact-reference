@@ -22,12 +22,12 @@ fn relocated_doctest() {
         .upon_receiving("a retrieve Mallory request")
             // define the request, a GET (default) request to '/mallory'
             .path("/mallory")
-            .query(vec![("quality", vec!["good"])])
+            .query_param("quality", "good")
         // define the response we want returned
         .will_respond_with()
             .status(200)
             .header("Content-Type", "text/html")
-            .body_present("That is some good Mallory.")
+            .body("That is some good Mallory.")
         .build();
 
     // Execute the run method to have the mock server run (the URL to the mock server will be passed in).
