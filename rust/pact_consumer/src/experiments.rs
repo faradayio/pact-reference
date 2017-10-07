@@ -1,5 +1,7 @@
 use pact_matching::models::*;
 
+use matchable::*;
+
 struct PactBuilder {
     pact: Pact,
 }
@@ -110,7 +112,7 @@ impl ResponseBuilder {
         self
     }
 
-    fn body<B: Into<String>>(&mut self, body: B) -> &mut Self {
+    fn json_body<B: Into<JsonPattern>>(&mut self, body: B) -> &mut Self {
         self
     }
 
@@ -134,7 +136,16 @@ fn new_api() {
             i.response
                 .status(200)
                 .header("Content-Type", "application/json")
-                .body("Hello!");
+                .json_body(json_pattern!({
+                    "message": "Hello!",
+                }));
         })
         .build();
+
+    assert_eq!(pact.consumer.name, "Consumer");
+    assert_eq!(pact.provider.name, "Provider");
+    assert_eq!(pact.interactions.len(), 1);
+    let interaction = &pact.interactions[0];
+    assert_eq!(&interaction.description, "GET /greeting/hello");
+    assert_eq!(interaction.provider_state.as_ref().unwrap(), "a greeting named hello");
 }

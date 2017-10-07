@@ -38,8 +38,9 @@ use uuid::Uuid;
 use std::panic::{self, AssertUnwindSafe};
 use std::error::Error;
 
-mod experiments;
+#[macro_use]
 mod matchable;
+mod experiments;
 pub use self::matchable::*;
 
 /// Result of running the pact test
