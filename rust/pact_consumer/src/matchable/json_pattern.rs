@@ -17,7 +17,7 @@ use super::{Matchable, obj_key_for_path};
 /// or the provided helper functions:
 ///
 /// ```
-/// use pact_consumer::JsonPattern;
+/// use pact_consumer::prelude::*;
 ///
 /// let s: JsonPattern = "example".into();
 /// let b: JsonPattern = true.into();
@@ -55,30 +55,21 @@ impl JsonPattern {
 impl Matchable for JsonPattern {
     fn to_example(&self) -> serde_json::Value {
         match *self {
-            JsonPattern::Json(ref json) => {
-                json.to_owned()
-            }
+            JsonPattern::Json(ref json) => json.to_owned(),
             JsonPattern::Array(ref arr) => {
                 serde_json::Value::Array(arr.iter().map(|v| v.to_example()).collect())
             }
             JsonPattern::Object(ref obj) => {
-                let fields = obj.into_iter()
-                    .map(|(k, v)| (k.to_owned(), v.to_example()));
+                let fields = obj.into_iter().map(|(k, v)| (k.to_owned(), v.to_example()));
                 serde_json::Value::Object(serde_json::Map::from_iter(fields))
             }
-            JsonPattern::Matchable(ref matchable) => {
-                matchable.to_example()
-            }
+            JsonPattern::Matchable(ref matchable) => matchable.to_example(),
         }
     }
 
-    fn extract_matching_rules(
-        &self,
-        path: &str,
-        rules_out: &mut Matchers,
-    ) {
+    fn extract_matching_rules(&self, path: &str, rules_out: &mut Matchers) {
         match *self {
-            JsonPattern::Json(_) => {},
+            JsonPattern::Json(_) => {}
             JsonPattern::Array(ref arr) => {
                 for (i, val) in arr.into_iter().enumerate() {
                     let val_path = format!("{}[{}]", path, i);

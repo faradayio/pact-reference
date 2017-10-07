@@ -45,11 +45,7 @@ pub trait Matchable: Debug {
     ///
     /// [ruby]:
     /// https://github.com/pact-foundation/pact-support/blob/master/lib/pact/matching_rules/extract.rb
-    fn extract_matching_rules(
-        &self,
-        path: &str,
-        rules_out: &mut Matchers,
-    );
+    fn extract_matching_rules(&self, path: &str, rules_out: &mut Matchers);
 }
 
 /// Format a JSON object key for use in a JSON path expression. If we were
@@ -68,9 +64,10 @@ pub(crate) fn obj_key_for_path(key: &str) -> String {
     if IDENT.is_match(key) {
         format!(".{}", key)
     } else {
-        format!("['{}']", ESCAPE.replace_all(key, |caps: &Captures| {
-            format!(r#"\{}"#, &caps[0])
-        }))
+        format!(
+            "['{}']",
+            ESCAPE.replace_all(key, |caps: &Captures| format!(r#"\{}"#, &caps[0]))
+        )
     }
 }
 
