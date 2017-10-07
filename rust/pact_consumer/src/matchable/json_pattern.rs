@@ -1,50 +1,12 @@
 //! Our `JsonPattern` type and supporting code.
 
 use pact_matching::models::Matchers;
-use regex::{Captures, Regex};
 use serde_json;
 use std::borrow::Cow;
 use std::collections::HashMap as Map;
 use std::iter::FromIterator;
 
-use super::Matchable;
-
-/// Format a JSON object key for use in a JSON path expression. If we were
-/// more concerned about performance, we might try to come up with a scheme
-/// to minimize string allocation here.
-fn obj_key_for_path(key: &str) -> String {
-    lazy_static! {
-        // Only use "." syntax for things which are obvious identifiers.
-        static ref IDENT: Regex = Regex::new(r#"^[_A-Za-z][_A-Za-z0-9]*$"#)
-            .expect("could not parse IDENT regex");
-        // Escape these characters when using string syntax.
-        static ref ESCAPE: Regex = Regex::new(r#"\\|'"#)
-            .expect("could not parse ESCAPE regex");
-    }
-
-    if IDENT.is_match(key) {
-        format!(".{}", key)
-    } else {
-        format!("['{}']", ESCAPE.replace_all(key, |caps: &Captures| {
-            format!(r#"\{}"#, &caps[0])
-        }))
-    }
-}
-
-#[test]
-fn obj_key_for_path_quotes_keys_when_necessary() {
-    assert_eq!(obj_key_for_path("foo"), ".foo");
-    assert_eq!(obj_key_for_path("_foo"), "._foo");
-    assert_eq!(obj_key_for_path("["), "['[']");
-
-    // I don't actually know how the JSON Path specification wants us to handle
-    // these cases, but we need to _something_ to avoid panics or passing
-    // `Result` around everywhere, so let's go with JavaScript string escape
-    // syntax.
-    assert_eq!(obj_key_for_path(r#"''"#), r#"['\'\'']"#);
-    assert_eq!(obj_key_for_path(r#"a'"#), r#"['a\'']"#);
-    assert_eq!(obj_key_for_path(r#"\"#), r#"['\\']"#);
-}
+use super::{Matchable, obj_key_for_path};
 
 /// A pattern which can be used to either:
 ///

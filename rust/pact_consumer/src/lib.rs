@@ -221,7 +221,7 @@ impl ConsumerPactBuilder {
                 &mut self.interaction.request.headers
             }
         };
-        opt_headers_mut.get_or_insert_with(|| HashMap::new())
+        opt_headers_mut.get_or_insert_with(Default::default)
     }
 
     /// A header to be included in the request. Will overwrite previous headers
@@ -245,15 +245,52 @@ impl ConsumerPactBuilder {
         self
     }
 
-    /// Internal function which returns a mutable version of our query.
-    fn query_mut(&mut self) -> &mut HashMap<String, Vec<String>> {
+    /// Internal function which returns a mutable version of our query
+    /// and a mutable refence to our current collection of matching rules.
+    fn query_mut(&mut self) -> (
+        &mut HashMap<String, Vec<String>>,
+        &mut Matchers,
+     ) {
         self.push_interaction();
-        self.interaction.request.query.get_or_insert_with(|| HashMap::new())
+        let req = &mut self.interaction.request;
+        (
+            // This is a fairly tricky bit of Rust, because we need to borrow
+            // two fields of `req` mutably. Rust will let us do this, but it
+            // needs to see both borrows in the same function, and not hide
+            // either of them elsewhere.
+            req.query.get_or_insert_with(Default::default),
+            req.matching_rules.get_or_insert_with(Default::default),
+        )
     }
 
     /// A query parameter to be included in the request.
-    pub fn query_param<K, V>(&mut self, key: K, value: V) -> &mut Self {
-        unimplemented!("query_param")
+    pub fn query_param<K, V>(&mut self, key: K, value: V) -> &mut Self
+    where
+        K: Into<String>,
+        V: Into<JsonPattern>,
+    {
+        let key = key.into();
+        let value = value.into();
+        {
+            let (query, matching_rules) = self.query_mut();
+
+            let values = match value.to_example() {
+                serde_json::Value::String(s) => vec![s],
+                arr @ serde_json::Value::Array(_) => {
+                    serde_json::from_value(arr).expect("expected array of strings")
+                }
+                other => {
+                    panic!("expected array of strings, found: {}", other)
+                }
+            };
+            query.insert(key.clone(), values);
+
+            value.extract_matching_rules(
+                &format!("$.query{}", obj_key_for_path(&key)),
+                matching_rules,
+            );
+        }
+        self
     }
 
     /// The query string for the request. If called multiple times, this will
@@ -435,6 +472,22 @@ mod tests {
             .build_pact();
         let bad = ConsumerPactBuilder::consumer("A")
             .path("/farewell/bye")
+            .build_pact();
+        assert_requests_match!(good, pattern);
+        assert_requests_do_not_match!(bad, pattern);
+    }
+
+    #[test]
+    fn query_param_pattern() {
+        let greeting_regex = Regex::new("h.*").unwrap();
+        let pattern = ConsumerPactBuilder::consumer("A")
+            .query_param("greeting", Term::new(greeting_regex, "hello"))
+            .build_pact();
+        let good = ConsumerPactBuilder::consumer("A")
+            .query_param("greeting", "hi")
+            .build_pact();
+        let bad = ConsumerPactBuilder::consumer("A")
+            .query_param("greeting", "bye")
             .build_pact();
         assert_requests_match!(good, pattern);
         assert_requests_do_not_match!(bad, pattern);
