@@ -38,6 +38,7 @@ use uuid::Uuid;
 use std::panic::{self, AssertUnwindSafe};
 use std::error::Error;
 
+mod experiments;
 mod matchable;
 pub use self::matchable::*;
 
