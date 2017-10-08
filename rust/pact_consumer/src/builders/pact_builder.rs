@@ -1,5 +1,6 @@
 use pact_matching::models::*;
 
+use prelude::*;
 use super::interaction_builder::InteractionBuilder;
 
 /// Builder for `Pact` objects.
@@ -64,5 +65,11 @@ impl PactBuilder {
     /// Return the `Pact` we've built.
     pub fn build(&self) -> Pact {
         self.pact.clone()
+    }
+}
+
+impl StartMockServer for PactBuilder {
+    fn start_mock_server(&self) -> ValidatingMockServer {
+        ValidatingMockServer::new(self.build())
     }
 }

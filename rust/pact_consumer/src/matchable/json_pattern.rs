@@ -92,7 +92,7 @@ impl Matchable for JsonPattern {
 #[test]
 fn json_pattern_is_matchable() {
     use env_logger;
-    env_logger::init().expect("could not initialize logger");
+    let _ = env_logger::init();
 
     use super::special_rules::SomethingLike;
 
