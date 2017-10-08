@@ -20,7 +20,7 @@ use super::interaction_builder::InteractionBuilder;
 ///     })
 ///     .build();
 ///
-/// // These request method and response status default as follows.
+/// // The request method and response status default as follows.
 /// assert_eq!(pact.interactions[0].request.method, "GET");
 /// assert_eq!(pact.interactions[0].response.status, 200);
 /// # }

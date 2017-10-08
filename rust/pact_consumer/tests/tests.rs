@@ -3,7 +3,7 @@
 extern crate pact_consumer;
 extern crate reqwest;
 
-use pact_consumer::*;
+use pact_consumer::prelude::*;
 use std::io::prelude::*;
 
 /// This is supposed to be a doctest in lib.rs, but it's breaking there. This
@@ -11,32 +11,28 @@ use std::io::prelude::*;
 /// popular libraries.
 #[test]
 fn relocated_doctest() {
-    /*
-    // Define the Pact for the test (you can setup multiple interactions by chaining the given or upon_receiving calls)
-    // Define the service consumer by name
-    let pact_runner = ConsumerPactBuilder::consumer("Consumer")
-        // Define the service provider that it has a pact with
-        .has_pact_with("Alice Service")
-        // defines a provider state. It is optional.
-        .given("there is some good mallory")
-        // upon_receiving starts a new interaction
-        .upon_receiving("a retrieve Mallory request")
-            // define the request, a GET (default) request to '/mallory'
-            .path("/mallory")
-            .query_param("quality", "good")
-        // define the response we want returned
-        .will_respond_with()
-            .status(200)
-            .header("Content-Type", "text/html")
-            .body("That is some good Mallory.")
+    // Define the Pact for the test, specify the names of the consuming
+    // application and the provider application.
+    let pact = PactBuilder::new("Consumer", "Alice Service")
+        // Start a new interaction. We can add as many interactions as we want.
+        .interaction("a retrieve Mallory request", |i| {
+            // Defines a provider state. It is optional.
+            i.given("there is some good mallory");
+            // Define the request, a GET (default) request to '/mallory'.
+            i.request.path("/mallory");
+            // Define the response we want returned.
+            i.response
+                .status(200)
+                .header("Content-Type", "text/plain")
+                .body("That is some good Mallory.");
+        })
         .build();
 
     // Execute the run method to have the mock server run (the URL to the mock server will be passed in).
     // It takes a closure to execute your requests and returns a Pact VerificationResult.
-    let result = pact_runner.run(&|url| {
-        // You would use your actual client code here
-        let query_url = format!("{}/mallory?quality=good", url);
-        let mut response = reqwest::get(&query_url)
+    let result = ConsumerPactRunner::new(pact).run(&|url| {
+        // You would use your actual client code here.
+        let mut response = reqwest::get(&format!("{}/mallory", url))
             .expect("could not fetch URL");
         let mut body = String::new();
         response.read_to_string(&mut body)
@@ -45,7 +41,6 @@ fn relocated_doctest() {
         Ok(())
     });
 
-    // This means it is all good
+    // This means it is all good.
     assert_eq!(result, VerificationResult::PactVerified);
-    */
 }
