@@ -75,6 +75,46 @@
 //! // requests.
 //! # }
 //! ```
+//!
+//! ## Matching using patterns
+//!
+//! You can also use patterns like `SomethingLike` or `Term` to allow more
+//! general matches, and you can build complex patterns using the
+//! `json_pattern!` macro:
+//!
+//! ```
+//! // Add this to `main.rs` or `lib.rs`.
+//! extern crate regex;
+//!
+//! # #[macro_use] extern crate pact_consumer;
+//! # fn main() {
+//! use pact_consumer::prelude::*;
+//! use regex::Regex;
+//!
+//! PactBuilder::new("quotes client", "quotes service")
+//!     .interaction("add a new quote to the database", |i| {
+//!         i.request
+//!             .method("POST")
+//!             .path("/quotes")
+//!             .header("Content-Type", "application/json")
+//!             .json_body(json_pattern!({
+//!                  // Allow the client to send any string as a quote.
+//!                  // When testing the server, use "Eureka!".
+//!                  "quote": SomethingLike::new(json_pattern!("Eureka!")),
+//!                  // Allow the client to send any string as an author.
+//!                  // When testing the server, use "Archimedes".
+//!                  "by": SomethingLike::new(json_pattern!("Archimedes")),
+//!              }));
+//!
+//!         let quotes_id = Regex::new("/quotes/[0-9]+").unwrap();
+//!         i.response
+//!             .status(201)
+//!             // Return a location of "/quotes/12" to the client. When
+//!             // testing the server, allow it to return any numeric ID.
+//!             .header("Location", Term::new(quotes_id, "/quotes/12"));
+//!     });
+//! # }
+//! ```
 
 #![warn(missing_docs)]
 
