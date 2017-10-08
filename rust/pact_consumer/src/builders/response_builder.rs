@@ -25,7 +25,12 @@ impl ResponseBuilder {
 
     /// Build the specified `Response` object.
     pub fn build(&self) -> Response {
-        self.response.clone()
+        let mut result = self.response.clone();
+        if result.matching_rules.as_ref().map_or(false, |r| r.is_empty()) {
+            // Empty matching rules break pact merging, so clean them up.
+            result.matching_rules = None;
+        }
+        result
     }
 }
 

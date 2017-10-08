@@ -99,7 +99,12 @@ impl RequestBuilder {
 
     /// Build the specified `Request` object.
     pub fn build(&self) -> Request {
-        self.request.clone()
+        let mut result = self.request.clone();
+        if result.matching_rules.as_ref().map_or(false, |r| r.is_empty()) {
+            // Empty matching rules break pact merging, so clean them up.
+            result.matching_rules = None;
+        }
+        result
     }
 }
 
