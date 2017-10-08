@@ -1,5 +1,4 @@
 use pact_matching::match_request;
-use regex::Regex;
 
 use super::*;
 
@@ -41,7 +40,6 @@ pub(crate) fn check_requests_match(
 
     Ok(())
 }
-
 
 macro_rules! assert_requests_match {
     ($actual:expr, $expected:expr) => (

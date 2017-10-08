@@ -2,17 +2,28 @@ use pact_matching::models::*;
 #[cfg(test)]
 use regex::Regex;
 use serde_json;
+use std::collections::HashMap;
 
 use matchable::obj_key_for_path;
 use prelude::*;
 
+/// Builder for `Request` objects. Normally created via `PactBuilder`.
 pub struct RequestBuilder {
     request: Request,
 }
 
 impl RequestBuilder {
     /// Specify the request method. Defaults to `"GET"`.
+    ///
+    /// ```
+    /// use pact_consumer::builders::RequestBuilder;
+    /// use pact_consumer::prelude::*;
+    ///
+    /// let request = RequestBuilder::default().method("POST").build();
+    /// assert_eq!(request.method, "POST");
+    /// ```
     pub fn method<M: Into<String>>(&mut self, method: M) -> &mut Self {
+        self.request.method = method.into();
         self
     }
 
@@ -47,9 +58,9 @@ impl RequestBuilder {
     /// # fn main() {
     /// let digits_re = Regex::new("^[0-9]+$").unwrap();
     /// RequestBuilder::default()
-    ///   .query_param("simple", "value")
-    ///   .query_param("pattern", Term::new(digits_re, "123"))
-    ///   .query_param("list", json_pattern!(["a", "b"]));
+    ///     .query_param("simple", "value")
+    ///     .query_param("pattern", Term::new(digits_re, "123"))
+    ///     .query_param("list", json_pattern!(["a", "b"]));
     /// # }
     /// ```
     pub fn query_param<K, V>(&mut self, key: K, values: V) -> &mut Self
@@ -70,7 +81,8 @@ impl RequestBuilder {
             }
             other => panic!("expected array of strings, found: {}", other),
         };
-        self.request.query
+        self.request
+            .query
             .get_or_insert_with(Default::default)
             .insert(key.clone(), values_example);
 
@@ -94,6 +106,27 @@ impl RequestBuilder {
 impl Default for RequestBuilder {
     fn default() -> Self {
         RequestBuilder { request: Request::default_request() }
+    }
+}
+
+impl HttpPartBuilder for RequestBuilder {
+    fn headers_and_matching_rules_mut(&mut self) -> (&mut HashMap<String, String>, &mut Matchers) {
+        (
+            self.request.headers.get_or_insert_with(Default::default),
+            self.request.matching_rules.get_or_insert_with(
+                Default::default,
+            ),
+        )
+    }
+
+    fn body_and_matching_rules_mut(&mut self) -> (&mut OptionalBody, &mut Matchers) {
+        (
+            &mut self.request.body,
+            self.request.matching_rules.get_or_insert_with(
+                Default::default,
+            ),
+        )
+
     }
 }
 

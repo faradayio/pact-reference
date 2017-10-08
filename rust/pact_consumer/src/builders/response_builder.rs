@@ -1,28 +1,29 @@
 use pact_matching::models::*;
+use std::collections::HashMap;
 
-use matchable::*;
+use prelude::*;
 
+/// Builder for `Response` objects. Normally created via `PactBuilder`.
 pub struct ResponseBuilder {
     response: Response,
 }
 
 impl ResponseBuilder {
+    /// Set the status code for the response. Defaults to `200`.
+    ///
+    /// ```
+    /// use pact_consumer::builders::ResponseBuilder;
+    /// use pact_consumer::prelude::*;
+    ///
+    /// let response = ResponseBuilder::default().status(404).build();
+    /// assert_eq!(response.status, 404);
+    /// ```
     pub fn status(&mut self, status: u16) -> &mut Self {
+        self.response.status = status;
         self
     }
 
-    pub fn header<K, V>(&mut self, key: K, value: V) -> &mut Self
-    where
-        K: Into<String>,
-        V: Into<String>,
-    {
-        self
-    }
-
-    pub fn json_body<B: Into<JsonPattern>>(&mut self, body: B) -> &mut Self {
-        self
-    }
-
+    /// Build the specified `Response` object.
     pub fn build(&self) -> Response {
         self.response.clone()
     }
@@ -31,5 +32,26 @@ impl ResponseBuilder {
 impl Default for ResponseBuilder {
     fn default() -> Self {
         ResponseBuilder { response: Response::default_response() }
+    }
+}
+
+impl HttpPartBuilder for ResponseBuilder {
+    fn headers_and_matching_rules_mut(&mut self) -> (&mut HashMap<String, String>, &mut Matchers) {
+        (
+            self.response.headers.get_or_insert_with(Default::default),
+            self.response.matching_rules.get_or_insert_with(
+                Default::default,
+            ),
+        )
+    }
+
+    fn body_and_matching_rules_mut(&mut self) -> (&mut OptionalBody, &mut Matchers) {
+        (
+            &mut self.response.body,
+            self.response.matching_rules.get_or_insert_with(
+                Default::default,
+            ),
+        )
+
     }
 }

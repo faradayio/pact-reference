@@ -63,7 +63,7 @@ pub mod builders;
 /// use pact_consumer::prelude::*;
 /// ```
 pub mod prelude {
-    pub use builders::PactBuilder;
+    pub use builders::{HttpPartBuilder, PactBuilder};
     pub use matchable::{ArrayLike, JsonPattern, Matchable, SomethingLike, Term};
 }
 use prelude::*;

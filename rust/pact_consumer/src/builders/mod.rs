@@ -3,11 +3,13 @@
 //! but that's currently undergoing heavy construction.
 
 mod interaction_builder;
+mod http_part_builder;
 mod pact_builder;
 mod request_builder;
 mod response_builder;
 
 pub use self::interaction_builder::*;
+pub use self::http_part_builder::*;
 pub use self::pact_builder::*;
 pub use self::request_builder::*;
 pub use self::response_builder::*;
